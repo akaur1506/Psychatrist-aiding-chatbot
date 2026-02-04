@@ -71,3 +71,51 @@ function togglePatient(btn) {
     dropdown.style.display === "block" ? "none" : "block";
 }
 
+async function doctorLogin() {
+  const email = document.getElementById("doctoremail").value;
+  const password = document.getElementById("doctorpassword").value;
+
+  if (!email || !password) {
+    alert("Please enter email and password");
+    return;
+  }
+
+  try {
+    const response = await fetch("http://localhost:3000/login", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json"
+      },
+      body: JSON.stringify({
+        email: email,
+        password: password
+      })
+    });
+
+    const data = await response.json();
+
+    if (data.user) {
+
+      // Optional: Ensure only doctors can login here
+      if (data.user.role !== "doctor") {
+        alert("Access denied. Not a doctor account.");
+        return;
+      }
+
+      // Store user info
+      localStorage.setItem("user", JSON.stringify(data.user));
+
+      alert("Login successful");
+
+      // Redirect to dashboard page
+      window.location.href = "doctor-dashboard.html";  // change if needed
+
+    } else {
+      alert(data.error || "Login failed");
+    }
+
+  } catch (error) {
+    console.error(error);
+    alert("Server error. Make sure backend is running.");
+  }
+}
