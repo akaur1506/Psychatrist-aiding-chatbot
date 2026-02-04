@@ -19,36 +19,52 @@
   </div>
 
   <script>
+    let sessionId = null;
+
+window.onload = async function() {
+  const user = JSON.parse(localStorage.getItem("user"));
+
+  const response = await fetch('http://localhost:3000/start-session', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ patient_id: user.id })
+  });
+
+  const data = await response.json();
+  sessionId = data.session.id;
+};
+
     let conversation = [];
 
-    function sendMessage() {
-      const input = document.getElementById('message-input');
-      const message = input.value.trim();
-      if (!message) return;
+function sendMessage() {
+  const input = document.getElementById('message-input');
+  const message = input.value.trim();
+  if (!message) return;
 
-      // Add user message
-      conversation.push({ role: 'user', content: message });
-      displayMessage('You: ' + message);
-      input.value = '';
+  displayMessage('You: ' + message);
+  input.value = '';
 
-      // Send to backend
-      fetch('http://127.0.0.1:8000/chat', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json'
-        },
-        body: JSON.stringify({ conversation: conversation })
-      })
-      .then(response => response.json())
-      .then(data => {
-        conversation.push({ role: 'assistant', content: data.reply });
-        displayMessage('Bot: ' + data.reply);
-      })
-      .catch(error => {
-        console.error('Error:', error);
-        displayMessage('Error: Could not get response');
-      });
-    }
+  const user = JSON.parse(localStorage.getItem("user"));
+
+fetch('http://localhost:3000/chat', {
+  method: 'POST',
+  headers: { 'Content-Type': 'application/json' },
+  body: JSON.stringify({
+    session_id: sessionId,
+    message: message
+  })
+})
+
+  .then(response => response.json())
+  .then(data => {
+    displayMessage('Bot: ' + data.reply);
+  })
+  .catch(error => {
+    console.error('Error:', error);
+    displayMessage('Error: Could not get response');
+  });
+}
+
 
     function displayMessage(message) {
       const messagesDiv = document.getElementById('chat-messages');

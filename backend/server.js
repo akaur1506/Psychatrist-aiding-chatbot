@@ -117,3 +117,76 @@ app.post('/start-session', async (req, res) => {
     session: data[0]
   })
 })
+
+import axios from 'axios'
+
+app.post('/chat', async (req, res) => {
+  const { session_id, message } = req.body
+
+  try {
+
+    // Save user message
+    await supabase.from('messages').insert([
+      {
+        session_id: session_id,
+        sender: 'patient',
+        message: message
+      }
+    ])
+
+    // Fetch entire conversation from DB
+    const { data: messages, error } = await supabase
+      .from('messages')
+      .select('*')
+      .eq('session_id', session_id)
+      .order('created_at', { ascending: true })
+
+    if (error) throw error
+
+    // Format conversation for AI
+    const conversation = messages.map(msg => ({
+      role: msg.sender === 'patient' ? 'user' : 'assistant',
+      content: msg.message
+    }))
+
+    // Send full conversation to Python AI
+    const aiResponse = await axios.post('http://127.0.0.1:8000/chat', {
+      conversation: conversation
+    })
+
+    const reply = aiResponse.data.reply
+
+    // Save AI reply
+    await supabase.from('messages').insert([
+      {
+        session_id: session_id,
+        sender: 'ai',
+        message: reply
+      }
+    ])
+
+    // Return reply
+    res.json({ reply })
+
+  } catch (err) {
+    console.error(err)
+    res.status(500).json({ error: "Chat failed" })
+  }
+})
+
+
+app.post('/start-session', async (req, res) => {
+  const { patient_id } = req.body
+
+  const { data, error } = await supabase
+    .from('sessions')
+    .insert([{ patient_id }])
+    .select()
+
+  if (error) {
+    return res.status(400).json({ error: error.message })
+  }
+
+  res.json({ session: data[0] })
+})
+
