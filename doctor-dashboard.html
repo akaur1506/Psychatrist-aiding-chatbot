@@ -1,0 +1,126 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Document</title>
+    <link rel="stylesheet" href="stylehactu.css">
+
+</head>
+<body>
+    <div class="container">
+
+  
+  <div class="logo">Psychiatrist Dashboard</div>
+
+<div class="doctor-bar">
+
+  <div class="doctor-info-box">
+    <span class="doctor-text">Dr. Ananya</span>
+    <button class="doctor-info-btn" onclick="toggleProfile()">▾</button>
+  </div>
+
+  <div class="profile-dropdown" id="profileDropdown">
+    <strong>Dr. Ananya Sharma</strong><br>
+    Psychiatrist<br>
+    ananya@hospital.com<br>
+    City Care Hospital
+    <hr>
+    <button onclick="logout()">Logout</button>
+  </div>
+
+</div>
+
+
+  
+  <div class="patients-header">
+    <input
+      type="text"
+      class="search-patient"
+      placeholder="Search patient..."
+      onkeyup="searchPatient()"
+    />
+
+    <button class="add-patient-btn" onclick="openRegistration()">
+      + Add Patient
+    </button>
+  </div> 
+
+<div class="patients-list">
+
+  <!-- Patient A -->
+  <div class="patient-card" data-name="patient a">
+
+    <div class="patient-header">
+      <div class="patient-name">Patient A</div>
+      <button class="patient-drop-btn" onclick="togglePatient(this)">▾</button>
+    </div>
+
+    <div class="patient-meta">
+      ID: P001<br>
+      Last session: 12 Sep 2025<br>
+      Next session: 20 Sep 2025
+    </div>
+
+    <div class="patient-dropdown">
+      <strong>Age:</strong> 28<br>
+      <strong>Disease:</strong> Anxiety Disorder<br>
+      <strong>Status:</strong> Improving<br>
+      <strong>Suggestion:</strong> Continue CBT
+    </div>
+
+  </div>
+
+  <!-- Patient B -->
+  <div class="patient-card" data-name="patient b">
+
+    <div class="patient-header">
+      <div class="patient-name">Patient B</div>
+      <button class="patient-drop-btn" onclick="togglePatient(this)">▾</button>
+    </div>
+
+    <div class="patient-meta">
+      ID: P002<br>
+      Last session: 10 Sep 2025<br>
+      Next session: 18 Sep 2025
+    </div>
+
+    <div class="patient-dropdown">
+      <strong>Age:</strong> 35<br>
+      <strong>Disease:</strong> Depression<br>
+      <strong>Status:</strong> Stable<br>
+      <strong>Suggestion:</strong> Medication follow-up
+    </div>
+
+  </div>
+
+  <!-- Patient C -->
+  <div class="patient-card" data-name="patient c">
+
+    <div class="patient-header">
+      <div class="patient-name">Patient C</div>
+      <button class="patient-drop-btn" onclick="togglePatient(this)">▾</button>
+    </div>
+
+    <div class="patient-meta">
+      ID: P003<br>
+      Last session: 08 Sep 2025<br>
+      Next session: 16 Sep 2025
+    </div>
+
+    <div class="patient-dropdown">
+      <strong>Age:</strong> 22<br>
+      <strong>Disease:</strong> PTSD<br>
+      <strong>Status:</strong> Moderate<br>
+      <strong>Suggestion:</strong> Weekly therapy
+    </div>
+
+  </div>
+
+</div>
+> <!-- container -->
+
+<script src="jsHacktu.js"></script>
+</body>
+</html>
+
