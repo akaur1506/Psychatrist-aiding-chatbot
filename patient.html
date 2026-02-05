@@ -4,6 +4,12 @@
   <meta charset="UTF-8">
   <title>Patient Page</title>
   <link rel="stylesheet" href="stylehactu.css">
+  <style>
+    #login-box { display: block; text-align: center; margin-top: 20px; }
+    #chat-container { display: none; }
+    input { padding: 8px; margin: 5px; width: 200px; }
+    button { padding: 8px 16px; cursor: pointer; }
+  </style>
 </head>
 
 <body>
@@ -11,15 +17,149 @@
     <div class="logo">Patient Interaction</div>
     <div class="subtitle">Welcome, Patient</div>
 
-    <div class="chat-container">
-      <div id="chat-messages"></div>
-      <input type="text" id="message-input" placeholder="Type your message...">
-      <button onclick="sendMessage()">Send</button>
+    <!-- Login Form -->
+    <div id="login-box">
+      <h3>Login</h3>
+      <input type="text" id="patient-name" placeholder="Name"><br>
+      <input type="password" id="patient-password" placeholder="Password"><br>
+      <button onclick="loginPatient()">Login</button>
+      <div id="login-error" style="color: red; margin-top: 10px;"></div>
+    </div>
+
+    <!-- Chat Interface (shown after login) -->
+    <div id="chat-container">
+      <p>Welcome, <span id="patient-welcome-name"></span>!</p>
+      <div class="chat-container">
+        <div id="chat-messages"></div>
+        <input type="text" id="message-input" placeholder="Type your message...">
+        <button onclick="sendMessage()">Send</button>
+      </div>
+      <div style="margin-top: 10px; display: flex; gap: 10px;">
+        <button onclick="logoutPatient()" style="flex: 1; background: #d9534f; color: white;">Logout</button>
+        <button onclick="endSessionManually()" style="flex: 1; background: #f0ad4e; color: white;">End Session</button>
+      </div>
     </div>
   </div>
 
   <script>
     let conversation = [];
+    let sessionId = null;
+    let patientId = null;
+    let patientName = null;
+
+    // Login function
+    async function loginPatient() {
+      const name = document.getElementById('patient-name').value;
+      const password = document.getElementById('patient-password').value;
+
+      if (!name || !password) {
+        document.getElementById('login-error').textContent = 'Please enter name and password';
+        return;
+      }
+
+      try {
+        const response = await fetch('http://127.0.0.1:8000/login', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ name, password })
+        });
+
+        const data = await response.json();
+
+        if (!response.ok) {
+          document.getElementById('login-error').textContent = data.detail || 'Login failed';
+          return;
+        }
+
+        // Store patient info
+        patientId = data.id;
+        patientName = data.name;
+        localStorage.setItem('patientId', patientId);
+        localStorage.setItem('patientName', patientName);
+        localStorage.setItem('patientRole', data.role);
+
+        // Show chat, hide login
+        document.getElementById('login-box').style.display = 'none';
+        document.getElementById('chat-container').style.display = 'block';
+        document.getElementById('patient-welcome-name').textContent = patientName;
+
+        // Start session
+        startSession();
+      } catch (error) {
+        console.error('Login error:', error);
+        document.getElementById('login-error').textContent = 'Server error: ' + error.message;
+      }
+    }
+
+    // Start session
+    function startSession() {
+      fetch('http://127.0.0.1:8000/sessions/start', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ patient_id: patientId })
+      })
+      .then(response => response.json())
+      .then(data => {
+        sessionId = data.session_id;
+        console.log('Session started:', sessionId);
+      })
+      .catch(error => console.error('Error starting session:', error));
+    }
+
+    // Logout function
+    function logoutPatient() {
+      endSession();
+      localStorage.removeItem('patientId');
+      localStorage.removeItem('patientName');
+      localStorage.removeItem('patientRole');
+      conversation = [];
+      sessionId = null;
+      patientId = null;
+      patientName = null;
+      
+      document.getElementById('login-box').style.display = 'block';
+      document.getElementById('chat-container').style.display = 'none';
+      document.getElementById('patient-name').value = '';
+      document.getElementById('patient-password').value = '';
+      document.getElementById('login-error').textContent = '';
+      document.getElementById('chat-messages').innerHTML = '';
+    }
+
+    // End session manually (user clicks button)
+    function endSessionManually() {
+      if (sessionId) {
+        fetch('http://127.0.0.1:8000/sessions/end', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ session_id: sessionId })
+        })
+        .then(response => response.json())
+        .then(data => {
+          alert('Session ended at ' + new Date().toLocaleTimeString());
+          // Keep user logged in, just end the session
+          sessionId = null;
+        })
+        .catch(err => console.error('Error ending session:', err));
+      }
+    }
+
+    // End session when user closes page — use sendBeacon for reliability
+    window.addEventListener('beforeunload', function() {
+      if (sessionId && navigator.sendBeacon) {
+        const data = JSON.stringify({ session_id: sessionId });
+        navigator.sendBeacon('http://127.0.0.1:8000/sessions/end', data);
+      }
+    });
+
+    // Heartbeat ping to keep session alive (every 30s)
+    setInterval(function() {
+      if (!sessionId) return;
+      fetch('http://127.0.0.1:8000/sessions/ping', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ session_id: sessionId })
+      }).catch(err => console.warn('Ping failed', err));
+    }, 30000);
 
     function sendMessage() {
       const input = document.getElementById('message-input');
@@ -58,12 +198,37 @@
       messagesDiv.scrollTop = messagesDiv.scrollHeight;
     }
 
+    function endSession() {
+      if (sessionId) {
+        fetch('http://127.0.0.1:8000/sessions/end', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ session_id: sessionId })
+        }).catch(err => console.warn('Error ending session:', err));
+      }
+    }
+
     // Allow sending with Enter key
     document.getElementById('message-input').addEventListener('keypress', function(e) {
       if (e.key === 'Enter') {
         sendMessage();
       }
     });
+
+    // Check if already logged in on page load
+    window.addEventListener('load', function() {
+      const savedPatientId = localStorage.getItem('patientId');
+      const savedPatientName = localStorage.getItem('patientName');
+      if (savedPatientId && savedPatientName) {
+        patientId = savedPatientId;
+        patientName = savedPatientName;
+        document.getElementById('login-box').style.display = 'none';
+        document.getElementById('chat-container').style.display = 'block';
+        document.getElementById('patient-welcome-name').textContent = patientName;
+        startSession();
+      }
+    });
   </script>
 </body>
 </html>
+

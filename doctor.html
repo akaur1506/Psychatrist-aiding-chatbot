@@ -5,54 +5,317 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Psychiatrist Dashboard</title>
   <link rel="stylesheet" href="stylehactu.css">
+  <style>
+    .hidden { display: none; }
+  </style>
 </head>
 
 <body>
-
   <div class="container">
+    <div class="logo">Psychiatrist Dashboard</div>
+    <div class="subtitle">Enter your credentials to continue</div>
 
-    
-    <div class="logo">
-      Psychiatrist Dashboard
+    <!-- Login Form -->
+    <div id="login-section" class="login-box">
+      <input type="text" id="doctoremail" placeholder="Name" class="input-field"><br><br>
+      <input type="password" id="doctorpassword" placeholder="Password" class="input-field"><br><br>
+      <div class="forgot-password">
+        <a href="#" onclick="forgotPassword()">Forgot password?</a>
+      </div>
+      <br>
+      <button class="doctor-button" onclick="doctorLogin()">Login</button>
+      <div id="login-error" style="color: red; margin-top: 10px;"></div>
     </div>
 
-    
-    <div class="subtitle">
-      Enter your credentials to continue
+    <!-- Dashboard (shown after login) -->
+    <div id="dashboard-section" class="hidden">
+      <div class="doctor-bar">
+        <div class="doctor-info-box">
+          <span class="doctor-text">Dr. <span id="doctor-name-display">Ananya</span></span>
+          <button class="doctor-info-btn" onclick="toggleProfile()">▾</button>
+        </div>
+
+        <div class="profile-dropdown" id="profileDropdown">
+          <strong id="doctor-full-name">Dr. Ananya Sharma</strong><br>
+          Psychiatrist<br>
+          <span id="doctor-email-display">ananya@hospital.com</span><br>
+          City Care Hospital
+          <hr>
+          <button onclick="logoutDoctor()">Logout</button>
+        </div>
+      </div>
+
+      <!-- Patient Registration Modal -->
+      <div id="register-modal" style="display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.5); z-index: 1000;">
+        <div style="background: white; padding: 30px; border-radius: 8px; width: 400px; margin: 50px auto; box-shadow: 0 4px 12px rgba(0,0,0,0.15);">
+          <h3 style="margin-top: 0;">Register New Patient</h3>
+          <input type="text" id="patient-name" placeholder="Patient Name" class="input-field"><br><br>
+          <input type="email" id="patient-email" placeholder="Patient Email" class="input-field"><br><br>
+          <input type="password" id="patient-password" placeholder="Patient Password" class="input-field"><br><br>
+          <button class="doctor-button" onclick="submitPatientRegistration()" style="width: 100%;">Register Patient</button>
+          <button onclick="closeRegistrationModal()" style="width: 100%; background: #999; margin-top: 10px;">Cancel</button>
+          <div id="registration-error" style="color: red; margin-top: 10px;"></div>
+          <div id="registration-success" style="color: green; margin-top: 10px;"></div>
+        </div>
+      </div>
+
+      <div class="patients-header">
+        <input type="text" class="search-patient" placeholder="Search patient..." onkeyup="searchPatient()"/>
+        <button class="add-patient-btn" onclick="openRegistration()">+ Add Patient</button>
+      </div>
+
+      <div class="patients-list" id="patients-list">
+        <!-- Patients loaded here -->
+      </div>
     </div>
 
-    
-    <div class="login-box">
-      <input
-        type="email"
-        id="doctoremail"
-        placeholder="Email"
-        class="input-field"
-      ><br><br>
-
-      <input
-        type="password"
-        id="doctorpassword"
-        placeholder="Password"
-        class="input-field"
-      ><br><br>
-<div class="forgot-password">
-  <a href="#" onclick="forgotPassword()">Forgot password?</a>
-</div>
-<br>
-
-      <button class="doctor-button" onclick="doctorLogin()">
-        Login
-      </button>
-    </div>
-
-    
-    <div class="footer">
+    <div class="footer" id="footer-section">
       Authorized Clinical access only
     </div>
-
   </div>
 
-  <script src="jsHacktu.js"></script>
+  <script>
+    let doctorId = null;
+    let doctorName = null;
+    let doctorEmail = null;
+
+    // Doctor Login
+    async function doctorLogin() {
+      const name = document.getElementById('doctoremail').value;
+      const password = document.getElementById('doctorpassword').value;
+
+      if (!name || !password) {
+        document.getElementById('login-error').textContent = 'Please enter name and password';
+        return;
+      }
+
+      try {
+        const response = await fetch('http://127.0.0.1:8000/login', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ name, password })
+        });
+
+        const data = await response.json();
+
+        if (!response.ok) {
+          document.getElementById('login-error').textContent = data.detail || 'Login failed';
+          return;
+        }
+
+        // Check if doctor role
+        if (data.role !== 'doctor') {
+          document.getElementById('login-error').textContent = 'Access denied: Only doctors can access this dashboard';
+          return;
+        }
+
+        // Store doctor info
+        doctorId = data.id;
+        doctorName = data.name;
+        doctorEmail = data.email;
+        localStorage.setItem('doctorId', doctorId);
+        localStorage.setItem('doctorName', doctorName);
+        localStorage.setItem('doctorEmail', doctorEmail);
+
+        // Show dashboard
+        showDashboard();
+      } catch (error) {
+        console.error('Login error:', error);
+        document.getElementById('login-error').textContent = 'Server error: ' + error.message;
+      }
+    }
+
+    // Show dashboard after login
+    function showDashboard() {
+      document.getElementById('login-section').classList.add('hidden');
+      document.getElementById('dashboard-section').classList.remove('hidden');
+      document.getElementById('footer-section').style.display = 'none';
+
+      // Populate doctor info
+      document.getElementById('doctor-name-display').textContent = doctorName;
+      document.getElementById('doctor-full-name').textContent = 'Dr. ' + doctorName;
+      document.getElementById('doctor-email-display').textContent = doctorEmail;
+
+      // Load patients (hardcoded for now, can be replaced with API call)
+      loadPatients();
+    }
+
+    // Load patients
+    function loadPatients() {
+      const patientsList = document.getElementById('patients-list');
+      patientsList.innerHTML = `
+        <div class="patient-card">
+          <div class="patient-header">
+            <div class="patient-name">Patient A</div>
+            <button class="patient-drop-btn" onclick="togglePatient(this)">▾</button>
+          </div>
+          <div class="patient-meta">
+            ID: P001<br>
+            Last session: 12 Sep 2025<br>
+            Next session: 20 Sep 2025
+          </div>
+          <div class="patient-dropdown">
+            <strong>Age:</strong> 28<br>
+            <strong>Disease:</strong> Anxiety Disorder<br>
+            <strong>Status:</strong> Improving<br>
+            <strong>Suggestion:</strong> Continue CBT
+          </div>
+        </div>
+
+        <div class="patient-card">
+          <div class="patient-header">
+            <div class="patient-name">Patient B</div>
+            <button class="patient-drop-btn" onclick="togglePatient(this)">▾</button>
+          </div>
+          <div class="patient-meta">
+            ID: P002<br>
+            Last session: 10 Sep 2025<br>
+            Next session: 18 Sep 2025
+          </div>
+          <div class="patient-dropdown">
+            <strong>Age:</strong> 35<br>
+            <strong>Disease:</strong> Depression<br>
+            <strong>Status:</strong> Stable<br>
+            <strong>Suggestion:</strong> Medication follow-up
+          </div>
+        </div>
+
+        <div class="patient-card">
+          <div class="patient-header">
+            <div class="patient-name">Patient C</div>
+            <button class="patient-drop-btn" onclick="togglePatient(this)">▾</button>
+          </div>
+          <div class="patient-meta">
+            ID: P003<br>
+            Last session: 08 Sep 2025<br>
+            Next session: 16 Sep 2025
+          </div>
+          <div class="patient-dropdown">
+            <strong>Age:</strong> 22<br>
+            <strong>Disease:</strong> PTSD<br>
+            <strong>Status:</strong> Moderate<br>
+            <strong>Suggestion:</strong> Weekly therapy
+          </div>
+        </div>
+      `;
+    }
+
+    // Logout
+    function logoutDoctor() {
+      localStorage.removeItem('doctorId');
+      localStorage.removeItem('doctorName');
+      localStorage.removeItem('doctorEmail');
+      doctorId = null;
+      doctorName = null;
+      doctorEmail = null;
+
+      document.getElementById('login-section').classList.remove('hidden');
+      document.getElementById('dashboard-section').classList.add('hidden');
+      document.getElementById('footer-section').style.display = 'block';
+      document.getElementById('doctoremail').value = '';
+      document.getElementById('doctorpassword').value = '';
+      document.getElementById('login-error').textContent = '';
+    }
+
+    // Toggle profile dropdown
+    function toggleProfile() {
+      const dropdown = document.getElementById('profileDropdown');
+      dropdown.style.display = dropdown.style.display === 'block' ? 'none' : 'block';
+    }
+
+    function forgotPassword() {
+      alert('Please contact system administrator to reset your password.');
+    }
+
+    function openRegistration() {
+      document.getElementById('register-modal').style.display = 'block';
+      document.getElementById('registration-error').textContent = '';
+      document.getElementById('registration-success').textContent = '';
+    }
+
+    function closeRegistrationModal() {
+      document.getElementById('register-modal').style.display = 'none';
+      document.getElementById('patient-name').value = '';
+      document.getElementById('patient-email').value = '';
+      document.getElementById('patient-password').value = '';
+    }
+
+    async function submitPatientRegistration() {
+      const name = document.getElementById('patient-name').value.trim();
+      const email = document.getElementById('patient-email').value.trim();
+      const password = document.getElementById('patient-password').value.trim();
+
+      if (!name || !email || !password) {
+        document.getElementById('registration-error').textContent = 'All fields are required';
+        return;
+      }
+
+      try {
+        const response = await fetch('http://127.0.0.1:8000/register-patient', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ name, email, password })
+        });
+
+        const data = await response.json();
+
+        if (!response.ok) {
+          document.getElementById('registration-error').textContent = data.detail || 'Registration failed';
+          return;
+        }
+
+        document.getElementById('registration-success').textContent = `✓ Patient "${name}" registered successfully!`;
+        setTimeout(() => {
+          closeRegistrationModal();
+        }, 2000);
+      } catch (error) {
+        console.error('Registration error:', error);
+        document.getElementById('registration-error').textContent = 'Server error: ' + error.message;
+      }
+    }
+
+    function searchPatient() {
+      const input = document.querySelector('.search-patient').value.toLowerCase();
+      const cards = document.querySelectorAll('.patient-card');
+
+      cards.forEach(card => {
+        const name = card.querySelector('.patient-name').innerText.toLowerCase();
+        if (name.includes(input)) {
+          card.style.display = 'block';
+          card.classList.add('highlight');
+        } else {
+          card.style.display = 'none';
+          card.classList.remove('highlight');
+        }
+      });
+
+      if (input === '') {
+        cards.forEach(card => {
+          card.style.display = 'block';
+          card.classList.remove('highlight');
+        });
+      }
+    }
+
+    function togglePatient(btn) {
+      const card = btn.closest('.patient-card');
+      const dropdown = card.querySelector('.patient-dropdown');
+      dropdown.style.display = dropdown.style.display === 'block' ? 'none' : 'block';
+    }
+
+    // Check if already logged in on page load
+    window.addEventListener('load', function() {
+      const savedDoctorId = localStorage.getItem('doctorId');
+      const savedDoctorName = localStorage.getItem('doctorName');
+      const savedDoctorEmail = localStorage.getItem('doctorEmail');
+
+      if (savedDoctorId && savedDoctorName) {
+        doctorId = savedDoctorId;
+        doctorName = savedDoctorName;
+        doctorEmail = savedDoctorEmail;
+        showDashboard();
+      }
+    });
+  </script>
 </body>
 </html>
